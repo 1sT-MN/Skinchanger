@@ -26,11 +26,35 @@ namespace WeaponPaints
 		[JsonPropertyName("CommandWpEnabled")]
 		public bool CommandWpEnabled { get; set; } = true;
 
+		[JsonPropertyName("CommandWebsiteEnabled")]
+		public bool CommandWebsiteEnabled { get; set; } = true;
+
+		[JsonPropertyName("CommandKnifeEnabled")]
+		public bool CommandKnifeEnabled { get; set; } = true;
+
+		[JsonPropertyName("CommandSkinsEnabled")]
+		public bool CommandSkinsEnabled { get; set; } = true;
+
+		[JsonPropertyName("CommandGlovesEnabled")]
+		public bool CommandGlovesEnabled { get; set; } = true;
+
+		[JsonPropertyName("CommandAgentsEnabled")]
+		public bool CommandAgentsEnabled { get; set; } = true;
+
+		[JsonPropertyName("CommandMusicEnabled")]
+		public bool CommandMusicEnabled { get; set; } = true;
+
+		[JsonPropertyName("CommandPinsEnabled")]
+		public bool CommandPinsEnabled { get; set; } = true;
+
+		[JsonPropertyName("CommandStatTrakEnabled")]
+		public bool CommandStatTrakEnabled { get; set; } = true;
+
 		[JsonPropertyName("CommandKillEnabled")]
-		public bool CommandKillEnabled { get; set; } = true;
+		public bool CommandKillEnabled { get; set; } = false;
 
 		[JsonPropertyName("CommandKnife")]
-		public List<string> CommandKnife { get; set; } = ["knife"];
+		public List<string> CommandKnife { get; set; } = ["knife", "knives"];
 
 		[JsonPropertyName("CommandMusic")]
 		public List<string> CommandMusic { get; set; } = ["music"];
@@ -71,9 +95,10 @@ namespace WeaponPaints
 
 	public class WeaponPaintsConfig : BasePluginConfig
 	{
-        [JsonPropertyName("ConfigVersion")] public override int Version { get; set; } = 10;
+		[JsonPropertyName("ConfigVersion")]
+		public override int Version { get; set; } = 11;
 
-        [JsonPropertyName("SkinsLanguage")]
+		[JsonPropertyName("SkinsLanguage")]
 		public string SkinsLanguage { get; set; } = "en";
 
 		[JsonPropertyName("DatabaseHost")]
@@ -90,6 +115,18 @@ namespace WeaponPaints
 
 		[JsonPropertyName("DatabaseName")]
 		public string DatabaseName { get; set; } = "";
+
+		[JsonPropertyName("DatabaseConnectionTimeoutSeconds")]
+		public uint DatabaseConnectionTimeoutSeconds { get; set; } = 5;
+
+		[JsonPropertyName("DatabaseCommandTimeoutSeconds")]
+		public uint DatabaseCommandTimeoutSeconds { get; set; } = 20;
+
+		[JsonPropertyName("DatabaseMaximumPoolSize")]
+		public uint DatabaseMaximumPoolSize { get; set; } = 32;
+
+		[JsonPropertyName("DatabaseOpenAttempts")]
+		public int DatabaseOpenAttempts { get; set; } = 3;
 
 		[JsonPropertyName("CmdRefreshCooldownSeconds")]
 		public int CmdRefreshCooldownSeconds { get; set; } = 3;

@@ -1,8 +1,8 @@
 using System.Collections.Concurrent;
-using System.Runtime.InteropServices;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Capabilities;
 using CounterStrikeSharp.API.Modules.Memory.DynamicFunctions;
+using CounterStrikeSharp.API.Modules.Menu;
 using CounterStrikeSharp.API.Modules.Utils;
 using MenuManager;
 using Microsoft.Extensions.Localization;
@@ -12,6 +12,7 @@ namespace WeaponPaints;
 
 public partial class WeaponPaints
 {
+	private readonly record struct WeaponImageDisplay(string Html, long Generation);
 	private static readonly Dictionary<string, string> WeaponList = new()
 	{
 		{"weapon_deagle", "Desert Eagle"},
@@ -73,25 +74,36 @@ public partial class WeaponPaints
 	};
 
 	public static IStringLocalizer? _localizer;
-	internal static readonly ConcurrentDictionary<int, ConcurrentDictionary<CsTeam, string>> GPlayersKnife = new();
-	internal static readonly ConcurrentDictionary<int, ConcurrentDictionary<CsTeam, ushort>> GPlayersGlove = new();
-	internal static readonly ConcurrentDictionary<int, ConcurrentDictionary<CsTeam, ushort>> GPlayersMusic = new();
-	internal static readonly ConcurrentDictionary<int, ConcurrentDictionary<CsTeam, ushort>> GPlayersPin = new();
-	internal static readonly ConcurrentDictionary<int, (string? CT, string? T)> GPlayersAgent = new();
-	internal static readonly ConcurrentDictionary<int, ConcurrentDictionary<CsTeam, ConcurrentDictionary<int, WeaponInfo>>> GPlayerWeaponsInfo = new();
+	internal static readonly PlayerPaintCache PlayerPaints = new();
 	internal static List<JObject> SkinsList = [];
 	internal static List<JObject> PinsList = [];
 	internal static List<JObject> GlovesList = [];
 	internal static List<JObject> AgentsList = [];
 	internal static List<JObject> MusicList = [];
+	internal static Dictionary<string, JObject[]> SkinsByWeapon = new(StringComparer.Ordinal);
+	internal static Dictionary<(int DefinitionIndex, int Paint), bool> LegacyModelBySkin = [];
+	internal static Dictionary<int, int[]> PaintsByDefinition = [];
+	internal static Dictionary<int, HashSet<string>> AgentModelsByTeam = [];
 	internal static WeaponSynchronization? WeaponSync;
 	private static bool _gBCommandsAllowed = true;
-	private readonly Dictionary<int, string> _playerWeaponImage = new();
+	private readonly Dictionary<ulong, WeaponImageDisplay> _playerWeaponImage = new();
+	private readonly Dictionary<string, IMenu> _skinMenus = new(StringComparer.Ordinal);
+	private readonly Dictionary<int, IMenu> _agentMenus = [];
 
-	private static readonly Dictionary<int, DateTime> CommandsCooldown = new();
+	private static readonly Dictionary<ulong, DateTime> CommandsCooldown = new();
 	internal static Database? Database;
+	private Task _databaseReady = Task.CompletedTask;
+	private readonly CancellationTokenSource _lifetime = new();
 
-	private static readonly MemoryFunctionVoid<nint, string, float> CAttributeListSetOrAddAttributeValueByName = new(GameData.GetSignature("CAttributeList_SetOrAddAttributeValueByName"));
+	private static MemoryFunctionVoid<nint, string, float> CAttributeListSetOrAddAttributeValueByName = null!;
+	private static readonly string[][] StickerAttributeNames = Enumerable.Range(0, 5)
+		.Select(slot => new[]
+		{
+			$"sticker slot {slot} id", $"sticker slot {slot} schema",
+			$"sticker slot {slot} offset x", $"sticker slot {slot} offset y",
+			$"sticker slot {slot} wear", $"sticker slot {slot} scale", $"sticker slot {slot} rotation"
+		})
+		.ToArray();
 	
 	//we dont need anymore because we use AcceptInput
 	//private static readonly MemoryFunctionWithReturn<nint, string, int, int> SetBodygroupFunc = new(
@@ -157,17 +169,21 @@ public partial class WeaponPaints
 		{ 525, "weapon_knife_skeleton" },
 		{ 526, "weapon_knife_kukri" }
 	};
+	private static readonly Dictionary<string, int> WeaponClassDefindex =
+		WeaponDefindex.ToDictionary(entry => entry.Value, entry => entry.Key, StringComparer.Ordinal);
 
 	private const ulong MinimumCustomItemId = 65578;
 	private ulong _nextItemId = MinimumCustomItemId;
-	private static readonly bool IsWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
-
-	private readonly ConcurrentDictionary<int, ConcurrentDictionary<int, float>> _temporaryPlayerWeaponWear = new();
+	private readonly ConcurrentDictionary<uint, ulong> _appliedWeaponSelections = new();
+	private readonly ConcurrentDictionary<ulong, long> _refreshesInProgress = new();
+	private readonly FailureLogLimiter _applyFailureLogs = new(TimeSpan.FromSeconds(10));
+	private const int ImageRenderIntervalTicks = 6;
+	private int _nextImageRenderTick;
 	
 	internal static IMenuApi? MenuApi;
 	private static readonly PluginCapability<IMenuApi> MenuCapability = new("menu:nfcore");
 	
 	private int _fadeSeed;
+	private long _nextImageGeneration;
 
-	internal List<CCSPlayerController> Players = [];
 }
