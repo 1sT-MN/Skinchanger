@@ -142,9 +142,9 @@ public partial class WeaponPaints
 
 	private static void ApplyTextureAttributes(nint attributes, CBasePlayerWeapon weapon)
 	{
-		CAttributeListSetOrAddAttributeValueByName.Invoke(attributes, "set item texture prefab", weapon.FallbackPaintKit);
-		CAttributeListSetOrAddAttributeValueByName.Invoke(attributes, "set item texture seed", weapon.FallbackSeed);
-		CAttributeListSetOrAddAttributeValueByName.Invoke(attributes, "set item texture wear", weapon.FallbackWear);
+		SetOrAddAttributeValueByName(attributes, "set item texture prefab", weapon.FallbackPaintKit);
+		SetOrAddAttributeValueByName(attributes, "set item texture seed", weapon.FallbackSeed);
+		SetOrAddAttributeValueByName(attributes, "set item texture wear", weapon.FallbackWear);
 	}
 
 	private static void SetStickers(CBasePlayerWeapon weapon, IReadOnlyList<StickerInfo> stickers)
@@ -154,13 +154,13 @@ public partial class WeaponPaints
 			StickerInfo sticker = stickers[slot];
 			nint attributes = weapon.AttributeManager.Item.NetworkedDynamicAttributes.Handle;
 			string[] names = StickerAttributeNames[slot];
-			CAttributeListSetOrAddAttributeValueByName.Invoke(attributes, names[0], ViewAsFloat(sticker.Id));
-			CAttributeListSetOrAddAttributeValueByName.Invoke(attributes, names[1], ViewAsFloat(sticker.Schema));
-			CAttributeListSetOrAddAttributeValueByName.Invoke(attributes, names[2], sticker.OffsetX);
-			CAttributeListSetOrAddAttributeValueByName.Invoke(attributes, names[3], sticker.OffsetY);
-			CAttributeListSetOrAddAttributeValueByName.Invoke(attributes, names[4], sticker.Wear);
-			CAttributeListSetOrAddAttributeValueByName.Invoke(attributes, names[5], sticker.Scale);
-			CAttributeListSetOrAddAttributeValueByName.Invoke(attributes, names[6], sticker.Rotation);
+			SetOrAddAttributeValueByName(attributes, names[0], ViewAsFloat(sticker.Id));
+			SetOrAddAttributeValueByName(attributes, names[1], ViewAsFloat(sticker.Schema));
+			SetOrAddAttributeValueByName(attributes, names[2], sticker.OffsetX);
+			SetOrAddAttributeValueByName(attributes, names[3], sticker.OffsetY);
+			SetOrAddAttributeValueByName(attributes, names[4], sticker.Wear);
+			SetOrAddAttributeValueByName(attributes, names[5], sticker.Scale);
+			SetOrAddAttributeValueByName(attributes, names[6], sticker.Rotation);
 		}
 	}
 
@@ -168,11 +168,11 @@ public partial class WeaponPaints
 	{
 		if (keyChain is not { Id: > 0 }) return;
 		nint attributes = weapon.AttributeManager.Item.NetworkedDynamicAttributes.Handle;
-		CAttributeListSetOrAddAttributeValueByName.Invoke(attributes, "keychain slot 0 id", ViewAsFloat(keyChain.Id));
-		CAttributeListSetOrAddAttributeValueByName.Invoke(attributes, "keychain slot 0 offset x", keyChain.OffsetX);
-		CAttributeListSetOrAddAttributeValueByName.Invoke(attributes, "keychain slot 0 offset y", keyChain.OffsetY);
-		CAttributeListSetOrAddAttributeValueByName.Invoke(attributes, "keychain slot 0 offset z", keyChain.OffsetZ);
-		CAttributeListSetOrAddAttributeValueByName.Invoke(attributes, "keychain slot 0 seed", ViewAsFloat(keyChain.Seed));
+		SetOrAddAttributeValueByName(attributes, "keychain slot 0 id", ViewAsFloat(keyChain.Id));
+		SetOrAddAttributeValueByName(attributes, "keychain slot 0 offset x", keyChain.OffsetX);
+		SetOrAddAttributeValueByName(attributes, "keychain slot 0 offset y", keyChain.OffsetY);
+		SetOrAddAttributeValueByName(attributes, "keychain slot 0 offset z", keyChain.OffsetZ);
+		SetOrAddAttributeValueByName(attributes, "keychain slot 0 seed", ViewAsFloat(keyChain.Seed));
 	}
 
 	private static void SetStatTrakAttributes(CBasePlayerWeapon weapon, int count)
@@ -184,8 +184,8 @@ public partial class WeaponPaints
 
 	private static void SetStatTrakAttributes(nint attributes, int count)
 	{
-		CAttributeListSetOrAddAttributeValueByName.Invoke(attributes, "kill eater", ViewAsFloat((uint)Math.Max(0, count)));
-		CAttributeListSetOrAddAttributeValueByName.Invoke(attributes, "kill eater score type", 0);
+		SetOrAddAttributeValueByName(attributes, "kill eater", ViewAsFloat((uint)Math.Max(0, count)));
+		SetOrAddAttributeValueByName(attributes, "kill eater score type", 0);
 	}
 
 	private void RefreshWeapons(CCSPlayerController? player)
@@ -254,9 +254,9 @@ public partial class WeaponPaints
 
 	private static void ApplyGloveTextureAttributes(nint attributes, WeaponInfo glove)
 	{
-		CAttributeListSetOrAddAttributeValueByName.Invoke(attributes, "set item texture prefab", glove.Paint);
-		CAttributeListSetOrAddAttributeValueByName.Invoke(attributes, "set item texture seed", glove.Seed);
-		CAttributeListSetOrAddAttributeValueByName.Invoke(attributes, "set item texture wear", NormalizeWear(glove.Wear));
+		SetOrAddAttributeValueByName(attributes, "set item texture prefab", glove.Paint);
+		SetOrAddAttributeValueByName(attributes, "set item texture seed", glove.Seed);
+		SetOrAddAttributeValueByName(attributes, "set item texture wear", NormalizeWear(glove.Wear));
 	}
 
 	private static void RestoreGloveBodygroup(int slot, ulong steamId, uint expectedPawnIndex)

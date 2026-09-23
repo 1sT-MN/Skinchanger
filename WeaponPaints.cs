@@ -14,6 +14,7 @@ public partial class WeaponPaints : BasePlugin, IPluginConfig<WeaponPaintsConfig
 {
 	internal static WeaponPaints Instance { get; private set; } = null!;
 	private bool _configured;
+	private bool _runtimeReady;
 
 	public WeaponPaintsConfig Config { get; set; } = new();
 	private static WeaponPaintsConfig _config { get; set; } = new();
@@ -78,10 +79,11 @@ public partial class WeaponPaints : BasePlugin, IPluginConfig<WeaponPaintsConfig
 			return;
 		}
 
+		if (!TryInitializeAttributeSet())
+			return;
 		Utility.LoadCatalogFiles(ModuleDirectory, _config.SkinsLanguage, Logger);
-		CAttributeListSetOrAddAttributeValueByName = new(
-			GameData.GetSignature("CAttributeList_SetOrAddAttributeValueByName"));
 		RegisterListeners();
+		_runtimeReady = true;
 		Logger.LogInformation("[WeaponPaints] {Version} started (hot reload: {HotReload}).", ModuleVersion, hotReload);
 
 		if (hotReload)
@@ -91,9 +93,48 @@ public partial class WeaponPaints : BasePlugin, IPluginConfig<WeaponPaintsConfig
 		}
 	}
 
+	private bool TryInitializeAttributeSet()
+	{
+		CAttributeListSetOrAddAttributeValueByName = null;
+		try
+		{
+			string signature = GameData.GetSignature(AttributeSetGameDataKey);
+			if (string.IsNullOrWhiteSpace(signature))
+			{
+				Logger.LogError(
+					"[SkinChanger] Gamedata key '{GameDataKey}' has no signature for library '{Library}'; plugin listeners and commands will not be registered.",
+					AttributeSetGameDataKey, AttributeSetLibrary);
+				return false;
+			}
+
+			CAttributeListSetOrAddAttributeValueByName = new(signature);
+			if (CAttributeListSetOrAddAttributeValueByName.Handle == nint.Zero)
+			{
+				CAttributeListSetOrAddAttributeValueByName = null;
+				Logger.LogError(
+					"[SkinChanger] Gamedata key '{GameDataKey}' in library '{Library}' produced an invalid function pointer; plugin listeners and commands will not be registered.",
+					AttributeSetGameDataKey, AttributeSetLibrary);
+				return false;
+			}
+
+			Logger.LogInformation("[SkinChanger] AttributeSet signature resolved successfully at 0x{Address:X}",
+				CAttributeListSetOrAddAttributeValueByName.Handle.ToInt64());
+			Interlocked.Exchange(ref _loggedInvalidAttributeList, 0);
+			return true;
+		}
+		catch (Exception exception)
+		{
+			CAttributeListSetOrAddAttributeValueByName = null;
+			Logger.LogError(exception,
+				"[SkinChanger] Failed to resolve gamedata key '{GameDataKey}' in library '{Library}'; plugin listeners and commands will not be registered.",
+				AttributeSetGameDataKey, AttributeSetLibrary);
+			return false;
+		}
+	}
+
 	public override void OnAllPluginsLoaded(bool hotReload)
 	{
-		if (!_configured) return;
+		if (!_runtimeReady) return;
 		RegisterCommands();
 		try
 		{
@@ -115,22 +156,24 @@ public partial class WeaponPaints : BasePlugin, IPluginConfig<WeaponPaintsConfig
 	public override void Unload(bool hotReload)
 	{
 		_lifetime.Cancel();
-		if (!_configured) return;
-		try { VirtualFunctions.GiveNamedItemFunc.Unhook(OnGiveNamedItemPost, HookMode.Post); }
-		catch (Exception exception) { Logger.LogDebug(exception, "[WeaponPaints] GiveNamedItem hook was already removed."); }
+		if (_runtimeReady)
+		{
+			try { VirtualFunctions.GiveNamedItemFunc.Unhook(OnGiveNamedItemPost, HookMode.Post); }
+			catch (Exception exception) { Logger.LogDebug(exception, "[WeaponPaints] GiveNamedItem hook was already removed."); }
 
-		RemoveListener<Listeners.OnMapStart>(OnMapStart);
-		RemoveListener<Listeners.OnMapEnd>(OnMapEnd);
-		RemoveListener<Listeners.OnEntitySpawned>(OnEntityCreated);
-		if (Config.Additional.ShowSkinImage) RemoveListener<Listeners.OnTick>(OnTick);
-		DeregisterEventHandler<EventPlayerSpawn>(OnPlayerSpawn);
-		DeregisterEventHandler<EventPlayerConnectFull>(OnClientFullConnect);
-		DeregisterEventHandler<EventPlayerDisconnect>(OnPlayerDisconnect);
-		DeregisterEventHandler<EventRoundStart>(OnRoundStart);
-		DeregisterEventHandler<EventRoundEnd>(OnRoundEnd);
-		DeregisterEventHandler<EventRoundMvp>(OnRoundMvp);
-		DeregisterEventHandler<EventPlayerDeath>(OnPlayerDeath);
-		DeregisterEventHandler<EventItemPickup>(OnItemPickup);
+			RemoveListener<Listeners.OnMapStart>(OnMapStart);
+			RemoveListener<Listeners.OnMapEnd>(OnMapEnd);
+			RemoveListener<Listeners.OnEntitySpawned>(OnEntityCreated);
+			if (Config.Additional.ShowSkinImage) RemoveListener<Listeners.OnTick>(OnTick);
+			DeregisterEventHandler<EventPlayerSpawn>(OnPlayerSpawn);
+			DeregisterEventHandler<EventPlayerConnectFull>(OnClientFullConnect);
+			DeregisterEventHandler<EventPlayerDisconnect>(OnPlayerDisconnect);
+			DeregisterEventHandler<EventRoundStart>(OnRoundStart);
+			DeregisterEventHandler<EventRoundEnd>(OnRoundEnd);
+			DeregisterEventHandler<EventRoundMvp>(OnRoundMvp);
+			DeregisterEventHandler<EventPlayerDeath>(OnPlayerDeath);
+			DeregisterEventHandler<EventItemPickup>(OnItemPickup);
+		}
 
 		PlayerPaints.Clear();
 		CommandsCooldown.Clear();
@@ -142,6 +185,8 @@ public partial class WeaponPaints : BasePlugin, IPluginConfig<WeaponPaintsConfig
 		WeaponSync = null;
 		Database = null;
 		MenuApi = null;
+		CAttributeListSetOrAddAttributeValueByName = null;
+		_runtimeReady = false;
 		Logger.LogInformation("[WeaponPaints] Plugin stopped (hot reload: {HotReload}).", hotReload);
 	}
 

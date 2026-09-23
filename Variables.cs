@@ -6,6 +6,7 @@ using CounterStrikeSharp.API.Modules.Menu;
 using CounterStrikeSharp.API.Modules.Utils;
 using MenuManager;
 using Microsoft.Extensions.Localization;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 
 namespace WeaponPaints;
@@ -95,7 +96,30 @@ public partial class WeaponPaints
 	private Task _databaseReady = Task.CompletedTask;
 	private readonly CancellationTokenSource _lifetime = new();
 
-	private static MemoryFunctionVoid<nint, string, float> CAttributeListSetOrAddAttributeValueByName = null!;
+	private const string AttributeSetGameDataKey = "CAttributeList_SetOrAddAttributeValueByName";
+	private const string AttributeSetLibrary = "server";
+	private static MemoryFunctionVoid<nint, string, float>? CAttributeListSetOrAddAttributeValueByName;
+	private static int _loggedInvalidAttributeList;
+
+	private static void SetOrAddAttributeValueByName(nint attributeList, string attributeName, float value)
+	{
+		MemoryFunctionVoid<nint, string, float>? function = CAttributeListSetOrAddAttributeValueByName;
+		if (function == null || function.Handle == nint.Zero)
+		{
+			Instance.Logger.LogError(
+				"[SkinChanger] Refusing to invoke unresolved gamedata key '{GameDataKey}' in library '{Library}'.",
+				AttributeSetGameDataKey, AttributeSetLibrary);
+			return;
+		}
+		if (attributeList == nint.Zero)
+		{
+			if (Interlocked.Exchange(ref _loggedInvalidAttributeList, 1) == 0)
+				Instance.Logger.LogError("[SkinChanger] Refusing to invoke AttributeSet with a null attribute-list pointer.");
+			return;
+		}
+
+		function.Invoke(attributeList, attributeName, value);
+	}
 	private static readonly string[][] StickerAttributeNames = Enumerable.Range(0, 5)
 		.Select(slot => new[]
 		{
