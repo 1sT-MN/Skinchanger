@@ -3,6 +3,7 @@ using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Entities;
 using CounterStrikeSharp.API.Modules.Memory;
 using CounterStrikeSharp.API.Modules.Memory.DynamicFunctions;
+using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Logging;
 
 namespace WeaponPaints;
@@ -10,6 +11,7 @@ namespace WeaponPaints;
 public partial class WeaponPaints
 {
 	private bool _mvpPlayed;
+	private int _entityCallbackGeneration;
 
 	private HookResult OnClientFullConnect(EventPlayerConnectFull @event, GameEventInfo _)
 	{
@@ -88,6 +90,7 @@ public partial class WeaponPaints
 
 	private void ResetMapState()
 	{
+		Interlocked.Increment(ref _entityCallbackGeneration);
 		PlayerPaints.Clear();
 		_appliedWeaponSelections.Clear();
 		_refreshesInProgress.Clear();
@@ -187,22 +190,29 @@ public partial class WeaponPaints
 
 	private void OnEntityCreated(CEntityInstance entity)
 	{
+		if (!_runtimeReady || _lifetime.IsCancellationRequested || !entity.IsValid) return;
 		bool isKnife = entity.DesignerName.Contains("knife", StringComparison.Ordinal)
 		               || entity.DesignerName.Contains("bayonet", StringComparison.Ordinal);
 		if (!isKnife && !WeaponList.ContainsKey(entity.DesignerName)) return;
 		_appliedWeaponSelections.TryRemove(entity.Index, out _);
-		nint handle = entity.Handle;
-		uint index = entity.Index;
+		// Copy the numeric index+serial while the spawn callback's entity is
+		// valid. Native pointers and pointer-backed handles cannot cross frames.
+		uint rawHandle = entity.EntityHandle.Raw;
+		int generation = _entityCallbackGeneration;
 		string designerName = entity.DesignerName;
-		Server.NextWorldUpdate(() => TryApplySpawnedWeapon(handle, index, designerName));
+		Server.NextWorldUpdate(() => TryApplySpawnedWeapon(rawHandle, generation, designerName));
 	}
 
-	private void TryApplySpawnedWeapon(nint handle, uint expectedIndex, string expectedDesignerName)
+	private void TryApplySpawnedWeapon(uint rawHandle, int generation, string expectedDesignerName)
 	{
+		if (!_runtimeReady || _lifetime.IsCancellationRequested || generation != _entityCallbackGeneration) return;
 		try
 		{
-			var weapon = new CBasePlayerWeapon(handle);
-			if (!weapon.IsValid || weapon.Index != expectedIndex
+			// The uint overload stores a value; Value resolves through the entity
+			// system and checks the complete handle, including its serial number,
+			// BEFORE constructing a native wrapper. Deleted/reused slots return null.
+			var weapon = new CHandle<CBasePlayerWeapon>(rawHandle).Value;
+			if (weapon == null || !weapon.IsValid
 			    || !weapon.DesignerName.Equals(expectedDesignerName, StringComparison.Ordinal)) return;
 			var player = FindCurrentWeaponOwner(weapon);
 			bool allowOriginalOwner = false;

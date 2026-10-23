@@ -38,11 +38,16 @@ namespace WeaponPaints
 		internal static void LoadCatalogFiles(string moduleDirectory, string language, ILogger logger)
 		{
 			string safeLanguage = string.IsNullOrWhiteSpace(language) ? "en" : language.Trim();
-			WeaponPaints.SkinsList = LoadList(Path.Combine(moduleDirectory, "data", $"skins_{safeLanguage}.json"), logger);
-			WeaponPaints.GlovesList = LoadList(Path.Combine(moduleDirectory, "data", $"gloves_{safeLanguage}.json"), logger);
-			WeaponPaints.AgentsList = LoadList(Path.Combine(moduleDirectory, "data", $"agents_{safeLanguage}.json"), logger);
-			WeaponPaints.MusicList = LoadList(Path.Combine(moduleDirectory, "data", $"music_{safeLanguage}.json"), logger);
-			WeaponPaints.PinsList = LoadList(Path.Combine(moduleDirectory, "data", $"collectibles_{safeLanguage}.json"), logger);
+			if (safeLanguage.Any(character => !char.IsAsciiLetterOrDigit(character) && character is not ('-' or '_')))
+			{
+				logger.LogWarning("[WeaponPaints] Invalid catalog language {Language}; using English.", language);
+				safeLanguage = "en";
+			}
+			WeaponPaints.SkinsList = LoadList(moduleDirectory, "skins", safeLanguage, logger);
+			WeaponPaints.GlovesList = LoadList(moduleDirectory, "gloves", safeLanguage, logger);
+			WeaponPaints.AgentsList = LoadList(moduleDirectory, "agents", safeLanguage, logger);
+			WeaponPaints.MusicList = LoadList(moduleDirectory, "music", safeLanguage, logger);
+			WeaponPaints.PinsList = LoadList(moduleDirectory, "collectibles", safeLanguage, logger);
 			BuildCatalogIndexes();
 		}
 
@@ -91,41 +96,67 @@ namespace WeaponPaints
 			WeaponPaints.AgentModelsByTeam = agentsByTeam;
 		}
 
-		private static List<JObject> LoadList(string path, ILogger logger)
+		private static List<JObject> LoadList(string moduleDirectory, string catalog, string language, ILogger logger)
 		{
+			string path = Path.Combine(moduleDirectory, "data", $"{catalog}_{language}.json");
+			if (TryLoadList(path, logger) is { } localized) return localized;
+			if (!language.Equals("en", StringComparison.OrdinalIgnoreCase))
+			{
+				logger.LogWarning("[WeaponPaints] Catalog {Catalog} for language {Language} is unavailable; using English.", catalog, language);
+				string englishPath = Path.Combine(moduleDirectory, "data", $"{catalog}_en.json");
+				if (TryLoadList(englishPath, logger) is { } english) return english;
+			}
+
+			using Stream stream = typeof(Utility).Assembly.GetManifestResourceStream($"WeaponPaints.Catalogs.{catalog}_en.json")
+				?? throw new InvalidOperationException($"Bundled catalog {catalog}_en.json is missing from WeaponPaints.dll.");
+			using var reader = new StreamReader(stream);
+			var rows = JsonConvert.DeserializeObject<List<JObject>>(reader.ReadToEnd())
+				?? throw new InvalidOperationException($"Bundled catalog {catalog}_en.json is empty.");
+			logger.LogInformation("[WeaponPaints] Loaded bundled English catalog {Catalog} ({Count} entries).", catalog, rows.Count);
+			return rows;
+		}
+
+		private static List<JObject>? TryLoadList(string path, ILogger logger)
+		{
+			if (!File.Exists(path)) return null;
 			try
 			{
-				return JsonConvert.DeserializeObject<List<JObject>>(File.ReadAllText(path)) ?? [];
+				return JsonConvert.DeserializeObject<List<JObject>>(File.ReadAllText(path))
+					?? throw new JsonException("Catalog must contain a JSON array.");
 			}
 			catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
 			{
-				logger.LogError(exception, "[WeaponPaints] Failed to load catalog file {CatalogFile}.", path);
-				return [];
+				logger.LogWarning(exception, "[WeaponPaints] Failed to load catalog file {CatalogFile}; trying the English fallback.", path);
+				return null;
 			}
 		}
 
 		internal static IMenu? CreateMenu(string title)
 		{
 			string menuType = WeaponPaints.Instance.Config.MenuType?.Trim() ?? "selectable";
+			if (WeaponPaints.MenuApi == null)
+				return menuType.Equals("console", StringComparison.OrdinalIgnoreCase)
+					? new ConsoleMenu(title)
+					: new ChatMenu(title);
         
 			var menu = menuType switch
 			{
 				_ when menuType.Equals("selectable", StringComparison.OrdinalIgnoreCase) =>
-					WeaponPaints.MenuApi?.NewMenu(title),
+					WeaponPaints.MenuApi?.GetMenu(title),
 
 				_ when menuType.Equals("dynamic", StringComparison.OrdinalIgnoreCase) =>
-					WeaponPaints.MenuApi?.NewMenuForcetype(title, MenuType.ButtonMenu),
+					WeaponPaints.MenuApi?.GetMenuForcetype(title, MenuType.ButtonMenu),
 
 				_ when menuType.Equals("center", StringComparison.OrdinalIgnoreCase) =>
-					WeaponPaints.MenuApi?.NewMenuForcetype(title, MenuType.CenterMenu),
+					WeaponPaints.MenuApi?.GetMenuForcetype(title, MenuType.CenterMenu),
 
 				_ when menuType.Equals("chat", StringComparison.OrdinalIgnoreCase) =>
-					WeaponPaints.MenuApi?.NewMenuForcetype(title, MenuType.ChatMenu),
+					WeaponPaints.MenuApi?.GetMenuForcetype(title, MenuType.ChatMenu),
 
 				_ when menuType.Equals("console", StringComparison.OrdinalIgnoreCase) =>
-					WeaponPaints.MenuApi?.NewMenuForcetype(title, MenuType.ConsoleMenu),
+					WeaponPaints.MenuApi?.GetMenuForcetype(title, MenuType.ConsoleMenu),
 
-				_ => WeaponPaints.MenuApi?.NewMenu(title)
+				_ => WeaponPaints.MenuApi?.GetMenu(title)
 			};
 
 			return menu;

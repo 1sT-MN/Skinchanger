@@ -23,11 +23,16 @@ Unfinished, unoptimized and not fully functional ugly demo weapon paints plugin 
 
 ## ⚙️ Requirements
 **Ensure all the following dependencies are installed before proceeding**
-- [CounterStrikeSharp](https://github.com/roflmuffin/CounterStrikeSharp)
-- [PlayerSettings](https://github.com/NickFox007/PlayerSettingsCS2) - Required by MenuManagerCS2
-- [AnyBaseLibCS2](https://github.com/NickFox007/AnyBaseLibCS2) - Required by PlayerSettings
-- [MenuManagerCS2](https://github.com/NickFox007/MenuManagerCS2)
+- [CounterStrikeSharp](https://github.com/roflmuffin/CounterStrikeSharp) 1.0.377 or newer with .NET 10. On CS2 1.41.9.2, install the native engine-interface hotfix as well; rebuilding this plugin does not replace the server's native CounterStrikeSharp library.
 - MySQL database
+
+Enhanced menus optionally use [MenuManagerCS2](https://github.com/NickFox007/MenuManagerCS2),
+with [PlayerSettings](https://github.com/NickFox007/PlayerSettingsCS2) and
+[AnyBaseLibCS2](https://github.com/NickFox007/AnyBaseLibCS2). Without the
+`menu:nfcore` capability, selection commands use CounterStrikeSharp chat menus
+(or console menus when `MenuType` is `console`). Install the complete dependency
+stack to use selectable, dynamic, or center menus. Keep `MenuManagerApi.dll`
+available even without MenuManagerCore; the plugin references its interface.
 
 ## CS2 Server
 - Have working CounterStrikeSharp (**with RUNTIME!**)
@@ -36,6 +41,32 @@ Unfinished, unoptimized and not fully functional ugly demo weapon paints plugin 
 - Edit `addons/counterstrikesharp/configs/`**`plugins/WeaponPaints/WeaponPaints.json`** include database credentials
 - In `addons/counterstrikesharp/configs/`**`core.json`** set **FollowCS2ServerGuidelines** to **`false`**
 - Copy from plugins folder gamedata file **`weaponpaints.json`** to folder **`addons/counterstrikesharp/gamedata/`**
+
+English catalogs are included in build/publish output under `data/` and embedded
+in `WeaponPaints.dll`, so deploying without a `data/` directory still loads them.
+To customize catalogs, place `skins_<language>.json`, `gloves_<language>.json`,
+`agents_<language>.json`, `music_<language>.json`, and
+`collectibles_<language>.json` in `plugins/WeaponPaints/data/`. Set `SkinsLanguage`
+to that language. Missing or unreadable catalogs fall back to English, checking
+external English files before the bundled versions.
+
+For the local dependency stack, run `./build-all.sh Release` and copy the contents
+of `dist/` into `game/csgo/`. This includes MenuManagerCore, PlayerSettings,
+shared API assemblies, catalogs, and gamedata.
+
+The stack package includes a Linux x64 SQLite build compatible with glibc 2.28
+and newer. This avoids PlayerSettings startup failures from the upstream native
+library requiring glibc 2.34. Rebuild that library, if needed, with
+`bash 3rd_party/sqlite/build-compat.sh`; packaging checks its glibc requirement.
+
+Startup fallback regression checks: `dotnet run --project tests/StartupChecks.csproj -c Release`.
+
+Deferred weapon-spawn callbacks copy the numeric entity handle (index and serial)
+and resolve it through CounterStrikeSharp when they execute. They never retain a
+native entity pointer across world updates. Map reset and unload invalidate queued
+callbacks. The regression checks exercise deleted/reused handles using the actual
+CounterStrikeSharp resolver with an allocated entity-list fixture; they do not run
+a CS2 server or validate live cosmetic application.
 
 ## Plugin Configuration
 <details>

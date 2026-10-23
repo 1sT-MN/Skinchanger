@@ -19,8 +19,6 @@ env:
   PROJECT_PATH: "WeaponPaints.csproj"
   PROJECT_NAME: "WeaponPaints"
   OUTPUT_PATH: "./WeaponPaints"
-  UPSTREAM_DATA_PATH: "./upstream-weaponpaints/website/data"
-  UPSTREAM_REF: "fa8936f3959310acf94de410bc5bd0015f34ff24"
 
 jobs:
   build:
@@ -38,6 +36,8 @@ jobs:
       run: dotnet restore
     - name: Build
       run: dotnet build ${{ env.PROJECT_PATH }} -c WeaponPaints -o ${{ env.OUTPUT_PATH }}
+    - name: Verify startup fallbacks
+      run: dotnet run --project tests/StartupChecks.csproj -c WeaponPaints
 
   publish:
     if: github.event_name == 'push'
@@ -47,14 +47,6 @@ jobs:
     needs: build
     steps:
     - uses: actions/checkout@v4
-    - name: Checkout upstream catalog data
-      uses: actions/checkout@v4
-      with:
-        repository: Nereziel/cs2-WeaponPaints
-        ref: ${{ env.UPSTREAM_REF }}
-        path: upstream-weaponpaints
-        sparse-checkout: website/data
-        persist-credentials: false
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
@@ -70,11 +62,8 @@ jobs:
           ${{ env.OUTPUT_PATH }}/McMaster.NETCore.Plugins.dll \
           ${{ env.OUTPUT_PATH }}/Microsoft.DotNet.PlatformAbstractions.dll \
           ${{ env.OUTPUT_PATH }}/Microsoft.Extensions.DependencyModel.dll \
-    - name: Copy catalog data
+    - name: Verify packaged catalog data
       run: |
-        test -d "${{ env.UPSTREAM_DATA_PATH }}"
-        mkdir -p "${{ env.OUTPUT_PATH }}/data"
-        cp -R "${{ env.UPSTREAM_DATA_PATH }}/." "${{ env.OUTPUT_PATH }}/data/"
         for catalog in skins gloves agents music collectibles; do
           test -s "${{ env.OUTPUT_PATH }}/data/${catalog}_en.json"
         done

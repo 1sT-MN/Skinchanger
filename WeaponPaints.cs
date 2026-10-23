@@ -9,7 +9,7 @@ using MySqlConnector;
 
 namespace WeaponPaints;
 
-[MinimumApiVersion(373)]
+[MinimumApiVersion(377)]
 public partial class WeaponPaints : BasePlugin, IPluginConfig<WeaponPaintsConfig>
 {
 	internal static WeaponPaints Instance { get; private set; } = null!;
@@ -139,22 +139,29 @@ public partial class WeaponPaints : BasePlugin, IPluginConfig<WeaponPaintsConfig
 		try
 		{
 			MenuApi = MenuCapability.Get();
-			if (Config.Additional.KnifeEnabled) SetupKnifeMenu();
-			if (Config.Additional.SkinEnabled) SetupSkinsMenu();
-			if (Config.Additional.GloveEnabled) SetupGlovesMenu();
-			if (Config.Additional.AgentEnabled) SetupAgentsMenu();
-			if (Config.Additional.MusicEnabled) SetupMusicMenu();
-			if (Config.Additional.PinsEnabled) SetupPinsMenu();
+		}
+		catch (KeyNotFoundException)
+		{
+			MenuApi = null;
 		}
 		catch (Exception exception)
 		{
 			MenuApi = null;
-			Logger.LogError(exception, "[WeaponPaints] MenuManager is unavailable; non-menu commands remain registered.");
+			Logger.LogWarning(exception, "[WeaponPaints] Could not acquire the MenuManager capability; using built-in menus.");
 		}
+		if (MenuApi == null)
+			Logger.LogWarning("[WeaponPaints] MenuManager capability 'menu:nfcore' is unavailable; using built-in chat/console menus. Install MenuManagerCore and its dependencies to use enhanced menus.");
+		if (Config.Additional.KnifeEnabled) SetupKnifeMenu();
+		if (Config.Additional.SkinEnabled) SetupSkinsMenu();
+		if (Config.Additional.GloveEnabled) SetupGlovesMenu();
+		if (Config.Additional.AgentEnabled) SetupAgentsMenu();
+		if (Config.Additional.MusicEnabled) SetupMusicMenu();
+		if (Config.Additional.PinsEnabled) SetupPinsMenu();
 	}
 
 	public override void Unload(bool hotReload)
 	{
+		Interlocked.Increment(ref _entityCallbackGeneration);
 		_lifetime.Cancel();
 		if (_runtimeReady)
 		{

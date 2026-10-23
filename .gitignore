@@ -1,6 +1,8 @@
 .vs/
 bin/
 obj/
+dist/
+.stage/
 website/getskins.php
 .idea/
 WeaponPaints.sln.DotSettings.user
