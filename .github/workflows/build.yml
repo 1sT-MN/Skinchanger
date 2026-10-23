@@ -33,7 +33,7 @@ jobs:
       with:
         dotnet-version: 10.0.x
     - name: Restore
-      run: dotnet restore
+      run: dotnet restore ${{ env.PROJECT_PATH }}
     - name: Build
       run: dotnet build ${{ env.PROJECT_PATH }} -c WeaponPaints -o ${{ env.OUTPUT_PATH }}
     - name: Verify startup fallbacks
@@ -52,7 +52,7 @@ jobs:
       with:
         dotnet-version: 10.0.x
     - name: Restore
-      run: dotnet restore
+      run: dotnet restore ${{ env.PROJECT_PATH }}
     - name: Build
       run: dotnet build ${{ env.PROJECT_PATH }} -c WeaponPaints -o ${{ env.OUTPUT_PATH }}
     - name: Clean files
